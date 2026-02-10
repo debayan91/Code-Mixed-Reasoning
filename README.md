@@ -13,7 +13,7 @@ We propose a method to align the model's "Language of Thought" with the input la
 ## Objectives
 
 1.  **Synthetic Distillation:** Create a dataset of mathematical reasoning problems where the intermediate logical steps are performed in Romanized Hinglish, adhering to the Matrix Language Frame (MLF) theory.
-2.  **Low-Resource Fine-Tuning:** Demonstrate that complex reasoning capabilities can be instilled in an 8-parameter model (Llama-3-8B) using Quantized Low-Rank Adaptation (QLoRA) on consumer-grade hardware (Single T4 GPU).
+2.  **Low-Resource Fine-Tuning:** Demonstrate that complex reasoning capabilities can be instilled in an 8-billion parameter model (Llama-3-8B) using Quantized Low-Rank Adaptation (QLoRA) on consumer-grade hardware (Single T4 GPU).
 3.  **Ablation Study:** Compare the performance of Hinglish-CoT against English-CoT and Zero-Shot baselines to quantify the benefits of language alignment.
 
 ## Methodology
@@ -50,3 +50,50 @@ The training data follows the Alpaca-style JSONL format.
   "input": "If cost price is $100 and profit is 20%, what is selling price?",
   "output": "Cost Price (CP) $100 hai. Profit percentage 20% diya gaya hai. Selling Price (SP) nikalne ke liye hum formula use karenge: SP = CP + Profit. Pehle profit value nikalte hain: 20% of 100 = $20. Ab SP = 100 + 20 = 120. #### 120"
 }
+```
+
+## Setup and Reproduction
+
+### Prerequisites
+* Python 3.10+
+* PyTorch (CUDA supported)
+* Unsloth Library
+
+### Installation
+```bash
+pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+pip install --no-deps "xformers<0.0.27" "trl<0.9.0" peft accelerate bitsandbytes
+```
+
+### Training
+The training pipeline utilizes the `SFTTrainer` from the TRL library with 4-bit loading enabled.
+
+```python
+from unsloth import FastLanguageModel
+from trl import SFTTrainer
+from transformers import TrainingArguments
+
+# Load Model with QLoRA Configuration
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/llama-3-8b-Instruct-bnb-4bit",
+    max_seq_length = 2048,
+    dtype = None,
+    load_in_4bit = True,
+)
+
+# Attach Adapters
+model = FastLanguageModel.get_peft_model(
+    model,
+    r = 16,
+    target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    lora_alpha = 16,
+    lora_dropout = 0,
+    bias = "none",
+)
+
+# Training arguments should be configured for T4 GPU (batch size 2, grad accumulation 4)
+```
+
+## License
+
+This project is released under the MIT License. The dataset is derived from GSM8K (MIT License).
